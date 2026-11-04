@@ -21,6 +21,14 @@ func WithRequestTimeout(timeout time.Duration) Option {
 	}
 }
 
+// WithDmmHDCover rewrites DMM cover URLs (pics.dmm.co.jp, 800x538) to the HD
+// version on the new CDN (awsimgsrc.dmm.co.jp, 2184x1468). Off by default.
+func WithDmmHDCover(enabled bool) Option {
+	return func(e *Engine) {
+		e.dmmHDCover = enabled
+	}
+}
+
 // WithImageCache enables the on-disk image cache.
 // A nil cache simply disables caching.
 func WithImageCache(cache *imagecache.Cache) Option {

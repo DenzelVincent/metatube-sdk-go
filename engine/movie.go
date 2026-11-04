@@ -264,9 +264,12 @@ func (e *Engine) getMovieInfoByProviderID(provider mt.MovieProvider, id string, 
 	if id = provider.NormalizeMovieID(id); id == "" {
 		return nil, mt.ErrInvalidID
 	}
-	return e.getMovieInfoWithCallback(provider, id, lazy, func() (*model.MovieInfo, error) {
+	info, err := e.getMovieInfoWithCallback(provider, id, lazy, func() (*model.MovieInfo, error) {
 		return provider.GetMovieInfoByID(id)
 	})
+	// 高清封面只在读取时替换，不写回数据库：关掉开关后已缓存的条目会立刻恢复原图。
+	e.applyDmmHDCover(info)
+	return info, err
 }
 
 func (e *Engine) GetMovieInfoByProviderID(pid providerid.ProviderID, lazy bool) (*model.MovieInfo, error) {
@@ -342,9 +345,11 @@ func (e *Engine) getMovieInfoByProviderURL(provider mt.MovieProvider, rawURL str
 	case id == "":
 		return nil, mt.ErrInvalidURL
 	}
-	return e.getMovieInfoWithCallback(provider, id, lazy, func() (*model.MovieInfo, error) {
+	info, err := e.getMovieInfoWithCallback(provider, id, lazy, func() (*model.MovieInfo, error) {
 		return provider.GetMovieInfoByURL(rawURL)
 	})
+	e.applyDmmHDCover(info)
+	return info, err
 }
 
 func (e *Engine) GetMovieInfoByURL(rawURL string, lazy bool) (*model.MovieInfo, error) {

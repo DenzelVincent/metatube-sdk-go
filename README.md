@@ -198,10 +198,13 @@ make clean           # 清理 build 目录
 | `TOKEN` | `-token` |
 | `DSN` | `-dsn` |
 | `REQUEST_TIMEOUT` | `-request-timeout` |
+| `DMM_HD_COVER` | `-dmm-hd-cover` |
 | `DB_MAX_IDLE_CONNS` | `-db-max-idle-conns` |
 | `DB_MAX_OPEN_CONNS` | `-db-max-open-conns` |
 | `DB_AUTO_MIGRATE` | `-db-auto-migrate` |
 | `DB_PREPARED_STMT` | `-db-prepared-stmt` |
+
+`DMM_HD_COVER=true` 会把 DMM 系源（JavBus / JAV321 / FANZA）的封面地址从老 CDN（`pics.dmm.co.jp`，800×538）改写为新 CDN（`awsimgsrc.dmm.co.jp`，2184×1468），让 Jellyfin 按 2:3 裁切后仍有约 978×1468。只改读取时的 `cover_url`、不写回数据库；取不到作品 cid（DUGA / DAHLIA 等自家图床）时保持原图。默认关闭。
 
 此外 `MT_` 前缀用于提供者级配置，格式为 `MT_[MOVIE_|ACTOR_]PROVIDER_<名称>__<键>`，例如：
 

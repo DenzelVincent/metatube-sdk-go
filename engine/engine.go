@@ -28,6 +28,8 @@ type Engine struct {
 	name    string
 	timeout time.Duration
 	fetcher *fetch.Fetcher
+	// dmmHDCover rewrites DMM covers to the HD CDN version on read (issue #653).
+	dmmHDCover bool
 	// Engine Logger
 	logger *log.Logger
 	// Name:Config Case-Insensitive Map

@@ -28,6 +28,7 @@ var Config = &struct {
 
 	// engine config
 	RequestTimeout time.Duration
+	DmmHDCover     bool
 
 	// image cache config
 	ImageCacheDir  string
@@ -56,6 +57,8 @@ func init() {
 	flag.StringVar(&Config.Token, "token", "", "Token to access server")
 	flag.StringVar(&Config.DSN, "dsn", "", "Database Service Name")
 	flag.DurationVar(&Config.RequestTimeout, "request-timeout", engine.DefaultRequestTimeout, "Timeout per request")
+	flag.BoolVar(&Config.DmmHDCover, "dmm-hd-cover", false,
+		"Rewrite DMM cover URLs to the HD CDN version (2184x1468)")
 	flag.StringVar(&Config.ImageCacheDir, "image-cache-dir", "",
 		"Directory to cache downloaded images (default: <dsn dir>/image-cache)")
 	flag.Int64Var(&Config.ImageCacheSize, "image-cache-size", 1024,
@@ -86,6 +89,11 @@ func Router(names ...string) *gin.Engine {
 	// timeout must >= 1 second
 	if Config.RequestTimeout >= time.Second {
 		opts = append(opts, engine.WithRequestTimeout(Config.RequestTimeout))
+	}
+
+	// DMM 高清封面（issue #653）：只改读取时的 cover_url，不落库。
+	if Config.DmmHDCover {
+		opts = append(opts, engine.WithDmmHDCover(true))
 	}
 
 	// 图片缓存：下载过的原图留在本地，之后叠角标/裁剪都在本地完成，
