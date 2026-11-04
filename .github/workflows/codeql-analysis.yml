@@ -13,6 +13,12 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    # Code scanning 需要上传 SARIF；缺这一段时 fork 上必然报
+    # "does not have permission to access the CodeQL Action API endpoints"。
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     strategy:
       fail-fast: false
