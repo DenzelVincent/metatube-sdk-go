@@ -26,3 +26,4 @@ go.work.sum
 
 # Build files
 build/
+/.idea
