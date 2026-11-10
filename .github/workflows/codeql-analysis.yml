@@ -1,4 +1,4 @@
-name: "CodeQL"
+name: "检查：CodeQL 安全扫描"
 
 concurrency:
   group: codeql-${{ github.event_name }}-${{ github.ref }}

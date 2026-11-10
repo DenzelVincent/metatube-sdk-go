@@ -1,4 +1,4 @@
-name: Test
+name: "检查：单元测试"
 
 concurrency:
   group: test-${{ github.event_name }}-${{ github.ref }}

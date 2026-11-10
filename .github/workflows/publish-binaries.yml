@@ -1,4 +1,4 @@
-name: Publish Go Releases
+name: "发布：多平台命令行程序压缩包"  # 产物 = make releases 的 build/* 进 GitHub Release；依赖 ORG_PAT 密钥，fork 未配置则该步必红
 
 concurrency:
   group: release-${{ github.event_name }}-${{ github.ref }}
@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     tags:
-      - '*'
+      - 'v*'
 
 jobs:
   build:

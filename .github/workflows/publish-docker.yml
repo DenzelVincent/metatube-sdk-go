@@ -1,4 +1,4 @@
-name: Publish Docker Image
+name: "发布：GHCR 容器镜像"  # tag v* 或手动触发；产物 = ghcr.io/<owner>/metatube-server 的 latest 与版本标签（amd64+arm64）
 
 concurrency:
   group: docker-${{ github.event_name }}-${{ github.ref }}
