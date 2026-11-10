@@ -1,0 +1,87 @@
+name: "检查：单元测试、代码风格与安全扫描"  # main push / PR 触发；三个 job 并行，唯一产物是 CodeQL 的 SARIF
+
+concurrency:
+  group: checks-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    name: Go Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          check-latest: true
+          go-version-file: 'go.mod'
+
+      # translate/* 要各家翻译 API key，provider/* 的抓取测试在 testkit 里见到
+      # GITHUB_ACTIONS 就 t.SkipNow()，所以这里的绿只代表引擎和工具函数。
+      - name: Run test
+        run: |
+          go version
+          go test $(go list ./... | grep -Ev "github.com/metatube-community/metatube-sdk-go/translate")
+
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          check-latest: true
+          go-version-file: 'go.mod'
+
+      # 规则读 .golangci.yaml：govet / staticcheck / unused / misspell + gofumpt / gci。
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    # Code scanning 需要上传 SARIF；缺这一段时 fork 上必然报
+    # "does not have permission to access the CodeQL Action API endpoints"。
+    # 权限只给这个 job，test / lint 仍走仓库默认的最小权限。
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'go' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          check-latest: true
+          go-version-file: 'go.mod'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
