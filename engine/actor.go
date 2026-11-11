@@ -147,7 +147,8 @@ func (e *Engine) SearchActorAll(keyword string, fallback bool) (results []*model
 }
 
 func (e *Engine) searchActorProviders(keyword string, providers []mt.ActorProvider, fallback bool) (
-	results []*model.ActorSearchResult) {
+	results []*model.ActorSearchResult,
+) {
 	var (
 		mu sync.Mutex
 		wg sync.WaitGroup
