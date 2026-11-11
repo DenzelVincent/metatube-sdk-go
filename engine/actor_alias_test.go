@@ -9,6 +9,15 @@ import (
 	"github.com/metatube-community/metatube-sdk-go/model"
 )
 
+func TestPreferredActorProviders(t *testing.T) {
+	for _, name := range []string{"MINNANO", "avbase", "Gfriends"} {
+		assert.True(t, isPreferredActorProvider(name), "name: %s", name)
+	}
+	for _, name := range []string{"Wikipedia", "AV-LEAGUE", "ThePornDB"} {
+		assert.False(t, isPreferredActorProvider(name), "name: %s", name)
+	}
+}
+
 func TestNormalizeActorNameKey(t *testing.T) {
 	cases := map[string]string{
 		"柚井初美（ゆい はつみ）":    "柚井初美(ゆいはつみ)",

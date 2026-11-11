@@ -26,6 +26,7 @@ func TestActorAliasRoutes(t *testing.T) {
 	r.GET("/v1/actor-aliases", getActorAlias(app))
 	r.PUT("/v1/actor-aliases", putActorAlias(app))
 	r.POST("/v1/actor-aliases/merge", mergeActorAliases(app))
+	r.POST("/v1/actor-aliases/lookup", lookupActorAliases(app))
 
 	put := func(body string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPut, "/v1/actor-aliases", strings.NewReader(body))
@@ -84,6 +85,31 @@ func TestActorAliasRoutes(t *testing.T) {
 		w = get("name=柚井初美（ゆい　はつみ）")
 		require.Equal(t, http.StatusOK, w.Code)
 		assert.False(t, decode(t, w).Data.Found)
+	})
+
+	t.Run("batch lookup returns per-name results", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/actor-aliases/lookup",
+			strings.NewReader(`{"names":["ゆい はつみ","柚井初美","Nobody","  "]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var envelope struct {
+			Data actorAliasLookupResponse `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &envelope))
+		require.Len(t, envelope.Data.Items, 3)
+		assert.True(t, envelope.Data.Items[0].Found)
+		assert.True(t, envelope.Data.Items[1].Found)
+		assert.False(t, envelope.Data.Items[2].Found)
+
+		req = httptest.NewRequest(http.MethodPost, "/v1/actor-aliases/lookup",
+			strings.NewReader(`{"names":[]}`))
+		req.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("get miss returns found false", func(t *testing.T) {

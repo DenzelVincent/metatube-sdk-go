@@ -4,6 +4,7 @@ import (
 	goerr "errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"golang.org/x/text/language"
@@ -112,12 +113,46 @@ func (e *Engine) SearchActor(keyword, name string, fallback bool) ([]*model.Acto
 	return e.searchActor(keyword, provider, fallback)
 }
 
+// isPreferredActorProvider 标记优先搜索的演员源：名字/读音/拼音与头像主要来自这几个，
+// 其余来源只在优先源全部无结果且允许 fallback 时再查，避免每次搜索都扇出到所有源。
+func isPreferredActorProvider(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "minnano", "avbase", "gfriends":
+		return true
+	default:
+		return false
+	}
+}
+
 func (e *Engine) SearchActorAll(keyword string, fallback bool) (results []*model.ActorSearchResult, err error) {
+	var preferred, others []mt.ActorProvider
+	for _, provider := range e.actorProviders.Iterator() {
+		if isPreferredActorProvider(provider.Name()) {
+			preferred = append(preferred, provider)
+		} else {
+			others = append(others, provider)
+		}
+	}
+
+	results = e.searchActorProviders(keyword, preferred, fallback)
+	if len(results) == 0 && fallback {
+		results = e.searchActorProviders(keyword, others, fallback)
+	}
+
+	sort.SliceStable(results, func(i, j int) bool {
+		return e.MustGetActorProviderByName(results[i].Provider).Priority() >
+			e.MustGetActorProviderByName(results[j].Provider).Priority()
+	})
+	return
+}
+
+func (e *Engine) searchActorProviders(keyword string, providers []mt.ActorProvider, fallback bool) (
+	results []*model.ActorSearchResult) {
 	var (
 		mu sync.Mutex
 		wg sync.WaitGroup
 	)
-	for _, provider := range e.actorProviders.Iterator() {
+	for _, provider := range providers {
 		wg.Add(1)
 		go func(provider mt.ActorProvider) {
 			defer wg.Done()
@@ -133,11 +168,6 @@ func (e *Engine) SearchActorAll(keyword string, fallback bool) (results []*model
 		}(provider)
 	}
 	wg.Wait()
-
-	sort.SliceStable(results, func(i, j int) bool {
-		return e.MustGetActorProviderByName(results[i].Provider).Priority() >
-			e.MustGetActorProviderByName(results[j].Provider).Priority()
-	})
 	return
 }
 

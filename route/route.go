@@ -95,6 +95,7 @@ func New(app *engine.Engine, v auth.Validator) *gin.Engine {
 			actorAliases.GET("", getActorAlias(app))
 			actorAliases.PUT("", putActorAlias(app))
 			actorAliases.POST("/merge", mergeActorAliases(app))
+			actorAliases.POST("/lookup", lookupActorAliases(app))
 		}
 
 		images := private.Group("/images")

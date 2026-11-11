@@ -46,6 +46,83 @@ type actorAliasMergeRequest struct {
 	TranslatedName string `json:"translated_name"`
 }
 
+type actorAliasLookupRequest struct {
+	Names []string `json:"names" binding:"required"`
+}
+
+type actorAliasLookupItem struct {
+	Name      string                `json:"name"`
+	Found     bool                  `json:"found"`
+	Ambiguous bool                  `json:"ambiguous,omitempty"`
+	Person    *actorAliasPersonDTO  `json:"person,omitempty"`
+	Matches   []actorAliasPersonDTO `json:"matches,omitempty"`
+}
+
+type actorAliasLookupResponse struct {
+	Items []actorAliasLookupItem `json:"items"`
+}
+
+// lookupActorAliases 批量按名字查身份，一次请求覆盖整部影片的演员，
+// 避免每位演员最多 3 次单条查询。
+func lookupActorAliases(app *engine.Engine) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var body actorAliasLookupRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			abortWithStatusMessage(c, http.StatusBadRequest, err)
+			return
+		}
+		if len(body.Names) == 0 || len(body.Names) > 200 {
+			abortWithStatusMessage(c, http.StatusBadRequest, goerr.New("names must contain 1-200 entries"))
+			return
+		}
+
+		items := make([]actorAliasLookupItem, 0, len(body.Names))
+		seen := make(map[string]struct{}, len(body.Names))
+		for _, rawName := range body.Names {
+			name := strings.TrimSpace(rawName)
+			if name == "" {
+				continue
+			}
+			key := strings.ToLower(name)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+
+			item := actorAliasLookupItem{Name: name}
+			persons, err := app.FindActorPersonsByName(name)
+			switch {
+			case goerr.Is(err, gorm.ErrRecordNotFound):
+				items = append(items, item)
+				continue
+			case err != nil:
+				abortWithStatusMessage(c, http.StatusInternalServerError, err)
+				return
+			case len(persons) > 1:
+				item.Found = true
+				item.Ambiguous = true
+				for _, person := range persons {
+					item.Matches = append(item.Matches, toActorAliasPersonDTO(person))
+				}
+			default:
+				item.Found = true
+				person := toActorAliasPersonDTO(persons[0])
+				item.Person = &person
+			}
+			items = append(items, item)
+		}
+
+		if len(items) == 0 {
+			abortWithStatusMessage(c, http.StatusBadRequest, goerr.New("names are all blank"))
+			return
+		}
+
+		c.JSON(http.StatusOK, &responseMessage{
+			Data: &actorAliasLookupResponse{Items: items},
+		})
+	}
+}
+
 func getActorAlias(app *engine.Engine) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var query actorAliasQuery

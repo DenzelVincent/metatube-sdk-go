@@ -243,6 +243,7 @@ MT_PROVIDER_FANZA__TIMEOUT="30s"
 | GET | `/v1/db/version` | 数据库版本 |
 | GET | `/v1/actor-aliases` | 按艺名或译名查演员身份，参数 `name` |
 | PUT | `/v1/actor-aliases` | 回写艺名与译名（幂等） |
+| POST | `/v1/actor-aliases/lookup` | 批量按名字查身份（一次最多 200 个） |
 | POST | `/v1/actor-aliases/merge` | 手工合并两个演员身份 |
 
 ### 演员身份表
@@ -252,7 +253,8 @@ MT_PROVIDER_FANZA__TIMEOUT="30s"
 - `stage_name`：搜索用的艺名（影片接口里的 B，含假名写法）。
 - `translated_name`：显示/合集名用的译名（影片里的 A 或引擎译文）。
 
-插件刮削时先按艺名或译名查表，未命中再走演员搜索与详情并回写；同一个名字对应多个身份时
+插件刮削时先按艺名或译名查表，未命中再走演员搜索（优先 MINNANO / AVBASE / Gfriends，
+`fallback=true` 且优先源无结果时才查其余来源）并回写；同一个名字对应多个身份时
 返回 `ambiguous`，不会自动合并。改名/换厂商后可用 merge 手工并成一个身份：
 
 ```bash
