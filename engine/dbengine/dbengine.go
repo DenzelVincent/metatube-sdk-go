@@ -59,6 +59,7 @@ func (e *engine) AutoMigrate() error {
 		&model.MovieInfo{},
 		&model.ActorInfo{},
 		&model.MovieReviewInfo{},
+		&model.TranslationInfo{},
 	); err != nil {
 		return err
 	}

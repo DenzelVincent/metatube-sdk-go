@@ -83,6 +83,14 @@ func New(app *engine.Engine, v auth.Validator) *gin.Engine {
 			reviews.GET("/:provider/:id", getReview(app))
 		}
 
+		// Term-level translation dictionary (actor/series/genre/maker/label).
+		// Kept private: PUT writes to the database and GET exposes cached values.
+		translations := private.Group("/translations")
+		{
+			translations.GET("/term", getTranslationTerm(app))
+			translations.PUT("/term", putTranslationTerm(app))
+		}
+
 		images := private.Group("/images")
 		{
 			// 清空本地原图缓存（元数据整理后调用一次）。
