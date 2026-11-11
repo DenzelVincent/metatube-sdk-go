@@ -31,7 +31,7 @@ func TestClassifyNumber(t *testing.T) {
 func TestAllowedProviderNames(t *testing.T) {
 	t.Run("censored", func(t *testing.T) {
 		allowed := allowedProviderNames("MIDV-123")
-		mustHave := []string{"JavDB", "JavBus", "FANZA"}
+		mustHave := []string{"JavBus", "FANZA"}
 		mustNotHave := []string{"HEYZO", "FC2", "1Pondo"}
 		for _, name := range mustHave {
 			if _, ok := allowed[name]; !ok {
@@ -47,7 +47,7 @@ func TestAllowedProviderNames(t *testing.T) {
 
 	t.Run("uncensored", func(t *testing.T) {
 		allowed := allowedProviderNames("HEYZO-1234")
-		mustHave := []string{"JavDB", "HEYZO"}
+		mustHave := []string{"HEYZO"}
 		mustNotHave := []string{"FANZA", "FC2"}
 		for _, name := range mustHave {
 			if _, ok := allowed[name]; !ok {
@@ -63,7 +63,7 @@ func TestAllowedProviderNames(t *testing.T) {
 
 	t.Run("fc2", func(t *testing.T) {
 		allowed := allowedProviderNames("FC2-123456")
-		mustHave := []string{"JavDB", "FC2", "FC2PPVDB"}
+		mustHave := []string{"FC2", "FC2PPVDB"}
 		mustNotHave := []string{"FANZA", "HEYZO"}
 		for _, name := range mustHave {
 			if _, ok := allowed[name]; !ok {

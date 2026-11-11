@@ -97,7 +97,7 @@ func Router(names ...string) *gin.Engine {
 	}
 
 	// 图片缓存：下载过的原图留在本地，之后叠角标/裁剪都在本地完成，
-	// 不再依赖 javdb / javbus 与代理是否可达。
+	// 不再依赖图床与代理是否可达。
 	if cache := openImageCache(); cache != nil {
 		opts = append(opts, engine.WithImageCache(cache))
 		log.Printf("[INFO] 图片缓存已启用：%s（上限 %d MB）", cache.Dir(), Config.ImageCacheSize)

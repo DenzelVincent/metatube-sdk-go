@@ -2,7 +2,7 @@
 
 元数据刮削服务端，为 [Jellyfin / Emby 的 MetaTube 插件](https://github.com/metatube-community/jellyfin-plugin-metatube) 提供 REST API。
 
-> 本仓库是 [metatube-community/metatube-sdk-go](https://github.com/metatube-community/metatube-sdk-go) 的个人维护分支，在上游基础上补充了 JavDB 提供者、番号归一化与无码角标等改动，详见[本地改动](#本地改动)。
+> 本仓库是 [metatube-community/metatube-sdk-go](https://github.com/metatube-community/metatube-sdk-go) 的个人维护分支，在上游基础上补充了番号归一化与无码角标等改动，详见[本地改动](#本地改动)。
 >
 > **这些改动不会出现在上游官方镜像中**，部署时请使用下方列出的自有镜像 `ghcr.io/ming0feng/metatube-server`。
 
@@ -11,7 +11,7 @@
 
 ## 特性
 
-- **20+ 元数据提供者**：JavDB、JavBus、MGS、MissAV、AVBASE、GFriends 等
+- **20+ 元数据提供者**：JavBus、MGS、MissAV、AVBASE、GFriends 等
 - **图片处理**：自动裁剪、角标、人脸检测、图片哈希
 - **文本翻译**：Baidu、Google、Google (Free)、DeepL、OpenAI 兼容
 - **数据库**：SQLite（默认内存模式）与 PostgreSQL
@@ -21,7 +21,7 @@
 
 ### Docker（推荐）
 
-本分支的改动（JavDB 提供者、番号归一化、无码角标）**只存在于下面的自有镜像中**，上游官方镜像不包含这些改动：
+本分支的改动（番号归一化、无码角标等）**只存在于下面的自有镜像中**，上游官方镜像不包含这些改动：
 
 | 镜像 | 含本分支改动 | 说明 |
 | --- | --- | --- |
@@ -208,7 +208,7 @@ make clean           # 清理 build 目录
 
 ```bash
 MT_MOVIE_PROVIDER_JAVBUS__COOKIE="dv=..."
-MT_PROVIDER_JAVDB__TIMEOUT="30s"
+MT_PROVIDER_FANZA__TIMEOUT="30s"
 ```
 
 ## API
@@ -250,7 +250,7 @@ curl "http://127.0.0.1:8080/v1/movies/search?q=SSIS-033&fallback=true"
 
 # 影片详情（启用令牌时）
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "http://127.0.0.1:8080/v1/movies/javdb/mO7dXZ"
+  "http://127.0.0.1:8080/v1/movies/javbus/SSIS-033"
 
 # 翻译
 curl "http://127.0.0.1:8080/v1/translate?q=hello&from=auto&to=zh-CN&engine=GoogleFree"
@@ -285,7 +285,6 @@ curl "http://127.0.0.1:8080/v1/translate?q=hello&from=auto&to=zh-CN&engine=Googl
 
 | 改动 | 说明 |
 | --- | --- |
-| JavDB 提供者 | 新增 `provider/javdb`，支持详情与搜索 |
 | 番号归一化 | 搜索前移除关键词中的空格，例如 `MIA B-585` → `MIAB-585` |
 | 番号补零 | 尾段数字不足 3 位时补零，例如 `DSAM-13` → `DSAM-013` |
 | 退役提供者兜底 | 缓存的提供者已下线时（如 JAV321），丢弃旧记录并按番号重新刮削 |

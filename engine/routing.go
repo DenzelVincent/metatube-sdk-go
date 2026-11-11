@@ -74,7 +74,7 @@ func classifyNumber(number string) ContentType {
 // 类型路由：综合索引总是参与搜索，类型专属站只在对应类型时参与。
 var (
 	generalProviders = []string{
-		"JavDB", "JavBus", "JAVFREE", "AVBASE", "JAV321", "FREEJAVBT",
+		"JavBus", "JAVFREE", "AVBASE", "JAV321", "FREEJAVBT",
 	}
 	censoredProviders = []string{
 		"FANZA", "SOD", "MGS", "FALENO", "DAHLIA", "DUGA", "Pcolle", "AVE", "OFFICIAL",
