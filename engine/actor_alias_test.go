@@ -90,11 +90,11 @@ func TestActorTranslationPriority(t *testing.T) {
 	assert.Equal(t, "柚井初美", person.TranslatedName)
 
 	// 空译名后续补写。
-	other, err := eng.SaveActorAlias(ActorAliasInput{
+	_, err = eng.SaveActorAlias(ActorAliasInput{
 		StageName: "あい", Provider: "MINNANO", ActorID: "43",
 	})
 	require.NoError(t, err)
-	other, err = eng.SaveActorAlias(ActorAliasInput{
+	other, err := eng.SaveActorAlias(ActorAliasInput{
 		StageName: "あい", TranslatedName: "爱", TranslationSource: "engine",
 		Provider: "MINNANO", ActorID: "43",
 	})
