@@ -10,7 +10,7 @@ const ActorPersonTableName = "actor_person"
 type ActorPerson struct {
 	ID                uint   `json:"id" gorm:"primaryKey"`
 	StageName         string `json:"stage_name" gorm:"column:display_name;size:255;not null"`
-	StageKey          string `json:"-" gorm:"size:255;not null;index"`
+	StageKey          string `json:"-" gorm:"size:255;not null;default:'';index"`
 	TranslatedName    string `json:"translated_name" gorm:"size:255"`
 	TranslatedKey     string `json:"-" gorm:"size:255;index"`
 	TranslationSource string `json:"-" gorm:"size:16"`
