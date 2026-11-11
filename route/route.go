@@ -88,6 +88,15 @@ func New(app *engine.Engine, v auth.Validator) *gin.Engine {
 			translations.PUT("/term", putTranslationTerm(app))
 		}
 
+		// Actor identity aliases: name variants (stage/kana/romaji/translation/alias)
+		// grouped by person. Kept private: PUT/merge write to the database.
+		actorAliases := private.Group("/actor-aliases")
+		{
+			actorAliases.GET("", getActorAlias(app))
+			actorAliases.PUT("", putActorAlias(app))
+			actorAliases.POST("/merge", mergeActorAliases(app))
+		}
+
 		images := private.Group("/images")
 		{
 			// 清空本地原图缓存（元数据整理后调用一次）。

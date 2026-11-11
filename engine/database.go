@@ -23,6 +23,8 @@ func (e *Engine) DBAutoMigrate(v bool) error {
 		&model.ActorInfo{},
 		&model.MovieReviewInfo{},
 		&model.TranslationInfo{},
+		&model.ActorPerson{},
+		&model.ActorName{},
 	)
 }
 

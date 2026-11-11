@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gocolly/colly/v2"
 	"golang.org/x/text/language"
@@ -144,9 +145,27 @@ func (mn *Minnano) GetActorInfoByURL(rawURL string) (info *model.ActorInfo, err 
 		}
 	})
 
-	info.Aliases = dedupeNames(info.Aliases, info.Name)
+	// 名字兜底：部分页面没有「名字（假名 / 罗马字）」行，只有 h1 的日文名与
+	// h1/span 的英文名（参考 kanojo-db/scrapers 的 minnanoav.py）。
+	var titleName string
+	var titleAliases []string
+	c.OnXML(`//h1`, func(e *colly.XMLElement) {
+		if titleName != "" {
+			return
+		}
+		titleName, titleAliases = parseTitleNames(e.Text, e.ChildText(`.//span`))
+	})
 
-	err = c.Visit(info.Homepage)
+	if err = c.Visit(info.Homepage); err != nil {
+		return
+	}
+
+	if info.Name == "" && titleName != "" {
+		info.Name = titleName
+		info.Aliases = append(info.Aliases, titleAliases...)
+	}
+
+	info.Aliases = dedupeNames(info.Aliases, info.Name)
 	return
 }
 
@@ -199,6 +218,54 @@ func (mn *Minnano) SearchActor(name string) (results []*model.ActorSearchResult,
 		}}, nil
 	}
 	return
+}
+
+// parseTitleNames 从 h1 解析日文名与英文名。raw 可能形如「柚井初美 / Yui Hatsumi」，
+// span 里可能只放英文名，也可能重复整行。英文名按参考实现处理：两个词时视为
+// 「姓 名」并交换，再按词首字母大写。
+func parseTitleNames(raw, span string) (name string, aliases []string) {
+	raw = strings.TrimSpace(raw)
+	span = strings.TrimSpace(span)
+	name = raw
+
+	if span != "" {
+		if trimmed := strings.TrimSpace(strings.TrimSuffix(raw, span)); trimmed != "" {
+			name = trimmed
+		}
+		parts := strings.Split(span, "/")
+		english := strings.TrimSpace(parts[len(parts)-1])
+		if english != "" && english != name {
+			if romaji := normalizeRomaji(english); romaji != "" {
+				aliases = append(aliases, romaji)
+			}
+		}
+	}
+
+	name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), "/"))
+	name = stripAnnotations(name)
+	return
+}
+
+// normalizeRomaji 只接受纯 ASCII 的英文名；两个词时交换为「名 姓」并做首字母大写。
+func normalizeRomaji(name string) string {
+	fields := strings.Fields(strings.TrimSpace(name))
+	if len(fields) == 0 {
+		return ""
+	}
+	for _, field := range fields {
+		for _, r := range field {
+			if r > unicode.MaxASCII {
+				return ""
+			}
+		}
+	}
+	if len(fields) == 2 {
+		fields[0], fields[1] = fields[1], fields[0]
+	}
+	for i, field := range fields {
+		fields[i] = strings.ToUpper(field[:1]) + strings.ToLower(field[1:])
+	}
+	return strings.Join(fields, " ")
 }
 
 func parseNameLine(raw string) (name string, aliases []string) {

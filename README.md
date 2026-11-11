@@ -241,6 +241,26 @@ MT_PROVIDER_FANZA__TIMEOUT="30s"
 | GET | `/v1/actors/search` | 演员搜索 |
 | GET | `/v1/reviews/:provider/:id` | 影评 |
 | GET | `/v1/db/version` | 数据库版本 |
+| GET | `/v1/actor-aliases` | 按名字查演员身份，参数 `name`、`target_lang` |
+| PUT | `/v1/actor-aliases` | 回写演员名字与译名（幂等） |
+| POST | `/v1/actor-aliases/merge` | 手工合并两个演员身份 |
+
+### 演员别名表
+
+同一个演员的艺名、假名读音、英文拼音、译名以及改名/换厂商后的写法，分别存在
+`actor_name` 的不同 `role` 里，并挂到同一个 `actor_person` 上。插件刮削时先按名字查表，
+未命中再走演员搜索与详情并回写；同一个名字指向多个身份时返回 `ambiguous`，不会自动合并。
+
+手工合并两个身份（例如改名后新旧两个来源）：
+
+```bash
+curl -X POST "http://127.0.0.1:8080/v1/actor-aliases/merge" \
+  -H "Authorization: Bearer YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"person_ids":[1,2],"display_name":"柚井初美"}'
+```
+
+`role` 取值：`stage`（艺名/汉字名）、`kana`（假名读音）、`romaji`（英文拼音）、
+`translation`（译名，带 `lang`）、`alias`（其它写法，如影片来源里的完整「名字（读音）」）。
 
 ### 示例
 
@@ -285,6 +305,7 @@ curl "http://127.0.0.1:8080/v1/translate?q=hello&from=auto&to=zh-CN&engine=Googl
 
 | 改动 | 说明 |
 | --- | --- |
+| 演员别名表 | 新增 `actor_person` / `actor_name` 表与 `/v1/actor-aliases`，维护艺名、假名、拼音、译名与改名关系 |
 | 番号归一化 | 搜索前移除关键词中的空格，例如 `MIA B-585` → `MIAB-585` |
 | 番号补零 | 尾段数字不足 3 位时补零，例如 `DSAM-13` → `DSAM-013` |
 | 退役提供者兜底 | 缓存的提供者已下线时（如 JAV321），丢弃旧记录并按番号重新刮削 |
