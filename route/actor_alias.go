@@ -13,50 +13,37 @@ import (
 )
 
 type actorAliasQuery struct {
-	Name       string `form:"name" binding:"required"`
-	TargetLang string `form:"target_lang"`
-}
-
-type actorAliasNameDTO struct {
-	Name string `json:"name"`
-	Role string `json:"role"`
-	Lang string `json:"lang,omitempty"`
+	Name string `form:"name" binding:"required"`
 }
 
 type actorAliasPersonDTO struct {
-	ID          uint   `json:"id"`
-	DisplayName string `json:"display_name"`
-	Provider    string `json:"provider"`
-	ActorID     string `json:"actor_id"`
+	ID             uint   `json:"id"`
+	StageName      string `json:"stage_name"`
+	TranslatedName string `json:"translated_name,omitempty"`
+	Provider       string `json:"provider"`
+	ActorID        string `json:"actor_id"`
 }
 
 type actorAliasResponse struct {
-	Found          bool                  `json:"found"`
-	Ambiguous      bool                  `json:"ambiguous,omitempty"`
-	Person         *actorAliasPersonDTO  `json:"person,omitempty"`
-	Names          []actorAliasNameDTO   `json:"names,omitempty"`
-	TranslatedName string                `json:"translated_name,omitempty"`
-	Matches        []actorAliasPersonDTO `json:"matches,omitempty"`
-	Conflicts      []string              `json:"conflicts,omitempty"`
-}
-
-type actorAliasTranslation struct {
-	Lang string `json:"lang" binding:"required"`
-	Text string `json:"text" binding:"required"`
+	Found     bool                  `json:"found"`
+	Ambiguous bool                  `json:"ambiguous,omitempty"`
+	Person    *actorAliasPersonDTO  `json:"person,omitempty"`
+	Matches   []actorAliasPersonDTO `json:"matches,omitempty"`
 }
 
 type actorAliasSaveRequest struct {
-	DisplayName string                 `json:"display_name"`
-	Provider    string                 `json:"provider" binding:"required"`
-	ActorID     string                 `json:"actor_id" binding:"required"`
-	Source      string                 `json:"source"`
-	Names       []actorAliasNameDTO    `json:"names"`
-	Translation *actorAliasTranslation `json:"translation"`
+	StageName         string `json:"stage_name" binding:"required"`
+	TranslatedName    string `json:"translated_name"`
+	TranslationSource string `json:"translation_source"`
+	Provider          string `json:"provider" binding:"required"`
+	ActorID           string `json:"actor_id" binding:"required"`
+	Source            string `json:"source"`
 }
 
 type actorAliasMergeRequest struct {
-	PersonIDs   []uint `json:"person_ids" binding:"required"`
-	DisplayName string `json:"display_name"`
+	PersonIDs      []uint `json:"person_ids" binding:"required"`
+	StageName      string `json:"stage_name"`
+	TranslatedName string `json:"translated_name"`
 }
 
 func getActorAlias(app *engine.Engine) gin.HandlerFunc {
@@ -98,27 +85,10 @@ func getActorAlias(app *engine.Engine) gin.HandlerFunc {
 			return
 		}
 
-		person := persons[0]
-		names, err := app.GetActorNames(person.ID)
-		if err != nil {
-			abortWithStatusMessage(c, http.StatusInternalServerError, err)
-			return
-		}
-
-		targetLang := strings.ToLower(strings.TrimSpace(query.TargetLang))
-		response := &actorAliasResponse{
-			Found:  true,
-			Person: toActorAliasPersonDTOPtr(person),
-			Names:  toActorAliasNameDTOs(names),
-		}
-		for _, name := range names {
-			if name.Role == model.ActorNameRoleTranslation && name.Lang == targetLang {
-				response.TranslatedName = name.Name
-				break
-			}
-		}
-
-		c.JSON(http.StatusOK, &responseMessage{Data: response})
+		person := toActorAliasPersonDTO(persons[0])
+		c.JSON(http.StatusOK, &responseMessage{
+			Data: &actorAliasResponse{Found: true, Person: &person},
+		})
 	}
 }
 
@@ -129,36 +99,17 @@ func putActorAlias(app *engine.Engine) gin.HandlerFunc {
 			abortWithStatusMessage(c, http.StatusBadRequest, err)
 			return
 		}
-		if strings.TrimSpace(body.Provider) == "" || strings.TrimSpace(body.ActorID) == "" {
-			abortWithStatusMessage(c, http.StatusBadRequest, engine.ErrActorAliasInvalid)
-			return
-		}
 
-		input := engine.ActorAliasInput{
-			DisplayName: body.DisplayName,
-			Provider:    body.Provider,
-			ActorID:     body.ActorID,
-			Source:      body.Source,
-		}
-		for _, name := range body.Names {
-			input.Names = append(input.Names, engine.ActorAliasNameInput{
-				Name: name.Name,
-				Role: name.Role,
-				Lang: name.Lang,
-			})
-		}
-		if body.Translation != nil {
-			input.Names = append(input.Names, engine.ActorAliasNameInput{
-				Name: body.Translation.Text,
-				Role: model.ActorNameRoleTranslation,
-				Lang: body.Translation.Lang,
-			})
-		}
-
-		person, names, conflicts, err := app.SaveActorAlias(input)
+		person, err := app.SaveActorAlias(engine.ActorAliasInput{
+			StageName:         body.StageName,
+			TranslatedName:    body.TranslatedName,
+			TranslationSource: body.TranslationSource,
+			Provider:          body.Provider,
+			ActorID:           body.ActorID,
+			Source:            body.Source,
+		})
 		switch {
 		case goerr.Is(err, engine.ErrActorAliasInvalid),
-			goerr.Is(err, engine.ErrActorAliasInvalidRole),
 			goerr.Is(err, engine.ErrActorAliasNameTooLong):
 			abortWithStatusMessage(c, http.StatusBadRequest, err)
 			return
@@ -167,13 +118,9 @@ func putActorAlias(app *engine.Engine) gin.HandlerFunc {
 			return
 		}
 
+		dto := toActorAliasPersonDTO(*person)
 		c.JSON(http.StatusOK, &responseMessage{
-			Data: &actorAliasResponse{
-				Found:     true,
-				Person:    toActorAliasPersonDTOPtr(*person),
-				Names:     toActorAliasNameDTOs(names),
-				Conflicts: conflicts,
-			},
+			Data: &actorAliasResponse{Found: true, Person: &dto},
 		})
 	}
 }
@@ -186,7 +133,7 @@ func mergeActorAliases(app *engine.Engine) gin.HandlerFunc {
 			return
 		}
 
-		person, names, err := app.MergeActorPersons(body.PersonIDs, body.DisplayName)
+		person, err := app.MergeActorPersons(body.PersonIDs, body.StageName, body.TranslatedName)
 		switch {
 		case goerr.Is(err, engine.ErrActorAliasMergeInvalid):
 			abortWithStatusMessage(c, http.StatusBadRequest, err)
@@ -199,41 +146,19 @@ func mergeActorAliases(app *engine.Engine) gin.HandlerFunc {
 			return
 		}
 
+		dto := toActorAliasPersonDTO(*person)
 		c.JSON(http.StatusOK, &responseMessage{
-			Data: &actorAliasResponse{
-				Found:  true,
-				Person: toActorAliasPersonDTOPtr(*person),
-				Names:  toActorAliasNameDTOs(names),
-			},
+			Data: &actorAliasResponse{Found: true, Person: &dto},
 		})
 	}
 }
 
 func toActorAliasPersonDTO(person model.ActorPerson) actorAliasPersonDTO {
 	return actorAliasPersonDTO{
-		ID:          person.ID,
-		DisplayName: person.DisplayName,
-		Provider:    person.Provider,
-		ActorID:     person.ActorID,
+		ID:             person.ID,
+		StageName:      person.StageName,
+		TranslatedName: person.TranslatedName,
+		Provider:       person.Provider,
+		ActorID:        person.ActorID,
 	}
-}
-
-func toActorAliasPersonDTOPtr(person model.ActorPerson) *actorAliasPersonDTO {
-	dto := toActorAliasPersonDTO(person)
-	return &dto
-}
-
-func toActorAliasNameDTOs(names []model.ActorName) []actorAliasNameDTO {
-	if len(names) == 0 {
-		return nil
-	}
-	dtos := make([]actorAliasNameDTO, 0, len(names))
-	for _, name := range names {
-		dtos = append(dtos, actorAliasNameDTO{
-			Name: name.Name,
-			Role: name.Role,
-			Lang: name.Lang,
-		})
-	}
-	return dtos
 }

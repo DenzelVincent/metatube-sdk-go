@@ -18,14 +18,35 @@ func (e *Engine) DBAutoMigrate(v bool) error {
 		locale = 'und-u-ks-level2',
 		deterministic = FALSE)`)
 	}
-	return e.db.AutoMigrate(
+	if err := e.db.AutoMigrate(
 		&model.MovieInfo{},
 		&model.ActorInfo{},
 		&model.MovieReviewInfo{},
 		&model.TranslationInfo{},
 		&model.ActorPerson{},
-		&model.ActorName{},
-	)
+	); err != nil {
+		return err
+	}
+
+	// v1.8.5 的 actor_name 明细表已被「person 存艺名+译名」取代，数据可重新学习。
+	_ = e.db.Migrator().DropTable("actor_name")
+	e.backfillActorPersonKeys()
+	return nil
+}
+
+// backfillActorPersonKeys 给升级前写入的 actor_person 补匹配键。
+func (e *Engine) backfillActorPersonKeys() {
+	var persons []model.ActorPerson
+	if err := e.db.Where("stage_key = '' OR stage_key IS NULL").Find(&persons).Error; err != nil {
+		return
+	}
+	for _, person := range persons {
+		updates := map[string]any{"stage_key": NormalizeActorNameKey(person.StageName)}
+		if person.TranslatedName != "" {
+			updates["translated_key"] = NormalizeActorNameKey(person.TranslatedName)
+		}
+		e.db.Model(&model.ActorPerson{}).Where("id = ?", person.ID).Updates(updates)
+	}
 }
 
 func (e *Engine) DBDriver() string {
