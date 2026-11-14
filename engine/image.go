@@ -17,10 +17,10 @@ import (
 
 // Default position constants for different kind of images.
 const (
-	defaultActorPrimaryImagePosition  = 0.5
-	defaultMoviePrimaryImagePosition  = 1.0
-	defaultMovieThumbImagePosition    = 0.5
-	defaultMovieBackdropImagePosition = 0.0
+	DefaultActorPrimaryImagePosition  = 0.5
+	DefaultMoviePrimaryImagePosition  = 1.0
+	DefaultMovieThumbImagePosition    = 0.5
+	DefaultMovieBackdropImagePosition = 0.0
 )
 
 func (e *Engine) GetActorPrimaryImage(pid providerid.ProviderID) (image.Image, error) {
@@ -33,7 +33,7 @@ func (e *Engine) GetActorPrimaryImage(pid providerid.ProviderID) (image.Image, e
 	}
 	return e.GetImageByURL(
 		e.MustGetActorProviderByName(pid.Provider), info.Images[0],
-		R.PrimaryImageRatio, defaultActorPrimaryImagePosition, false,
+		R.PrimaryImageRatio, DefaultActorPrimaryImagePosition, false,
 	)
 }
 
@@ -47,7 +47,29 @@ func (e *Engine) GetMoviePrimaryImage(pid providerid.ProviderID, ratio, pos floa
 	}
 	var auto bool
 	if pos < 0 /* manual position disabled */ {
-		pos = defaultMoviePrimaryImagePosition
+		pos = DefaultMoviePrimaryImagePosition
+		auto = number.RequiresFaceDetection(info.Number)
+	}
+	return e.GetImageByURL(
+		e.MustGetMovieProviderByName(pid.Provider),
+		url, ratio, pos, auto,
+	)
+}
+
+// GetMoviePrimaryImageByURL 与 GetMoviePrimaryImage 同口径（默认比例/位置、
+// 按番号决定是否启用人脸检测），但图片地址由调用方指定，
+// 用于 DMM 高清封面等改写场景；pos<0 同样归一化为右缘默认值。
+func (e *Engine) GetMoviePrimaryImageByURL(pid providerid.ProviderID, url string, ratio, pos float64) (image.Image, error) {
+	if ratio < 0 /* default primary ratio */ {
+		ratio = R.PrimaryImageRatio
+	}
+	var auto bool
+	if pos < 0 /* manual position disabled */ {
+		info, err := e.GetMovieInfoByProviderID(pid, true)
+		if err != nil {
+			return nil, err
+		}
+		pos = DefaultMoviePrimaryImagePosition
 		auto = number.RequiresFaceDetection(info.Number)
 	}
 	return e.GetImageByURL(
@@ -63,7 +85,7 @@ func (e *Engine) GetMovieThumbImage(pid providerid.ProviderID) (image.Image, err
 	}
 	return e.GetImageByURL(
 		e.MustGetMovieProviderByName(pid.Provider), url,
-		R.ThumbImageRatio, defaultMovieThumbImagePosition, false,
+		R.ThumbImageRatio, DefaultMovieThumbImagePosition, false,
 	)
 }
 
@@ -74,7 +96,7 @@ func (e *Engine) GetMovieBackdropImage(pid providerid.ProviderID) (image.Image, 
 	}
 	return e.GetImageByURL(
 		e.MustGetMovieProviderByName(pid.Provider), url,
-		R.BackdropImageRatio, defaultMovieBackdropImagePosition, false,
+		R.BackdropImageRatio, DefaultMovieBackdropImagePosition, false,
 	)
 }
 

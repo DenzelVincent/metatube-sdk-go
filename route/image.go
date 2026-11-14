@@ -84,17 +84,34 @@ func getImage(app *engine.Engine, typ imageType) gin.HandlerFunc {
 			err error
 		)
 		if query.URL != "" /* specified URL */ {
-			var provider mt.Provider
-			if isActorProvider {
-				provider = app.MustGetActorProviderByName(uri.Provider)
-			} else {
-				provider = app.MustGetMovieProviderByName(uri.Provider)
-			}
 			// query.Ratio should apply only to the primary images.
 			if typ != primaryImageType || query.Ratio < 0 {
 				query.Ratio = ratio
 			}
-			img, err = app.GetImageByURL(provider, query.URL, query.Ratio, query.Position, query.Auto)
+			if !isActorProvider && typ == primaryImageType {
+				// 影片主图走引擎统一口径：补默认位置并按番号决定是否人脸检测。
+				img, err = app.GetMoviePrimaryImageByURL(uri.AsProviderID(), query.URL, query.Ratio, query.Position)
+			} else {
+				var provider mt.Provider
+				if isActorProvider {
+					provider = app.MustGetActorProviderByName(uri.Provider)
+				} else {
+					provider = app.MustGetMovieProviderByName(uri.Provider)
+				}
+				// 与各自非指定 URL 路径同口径补默认位置，
+				// 避免 pos=-1 被原样当成裁切中心裁到左缘。
+				if query.Position < 0 {
+					switch {
+					case isActorProvider:
+						query.Position = engine.DefaultActorPrimaryImagePosition
+					case typ == thumbImageType:
+						query.Position = engine.DefaultMovieThumbImagePosition
+					default:
+						query.Position = engine.DefaultMovieBackdropImagePosition
+					}
+				}
+				img, err = app.GetImageByURL(provider, query.URL, query.Ratio, query.Position, query.Auto)
+			}
 		} else if isActorProvider /* actor */ {
 			switch typ {
 			case primaryImageType:
