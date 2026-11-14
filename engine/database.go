@@ -28,10 +28,34 @@ func (e *Engine) DBAutoMigrate(v bool) error {
 		return err
 	}
 
-	// v1.8.5 的 actor_name 明细表已被「person 存艺名+译名」取代，数据可重新学习。
+	// v1.8.5 的 actor_name 明细表已被「person 存艺名」取代，数据可重新学习。
 	_ = e.db.Migrator().DropTable("actor_name")
+	if err := e.dropActorTranslationColumns(); err != nil {
+		return err
+	}
 	e.backfillActorPersonKeys()
 	return nil
+}
+
+// dropActorTranslationColumns 物理删除 v1.8.9 的三个译名列并清空演员术语：
+// 演员不再翻译，只留优选艺名，不留脏数据。幂等，可重复执行。
+func (e *Engine) dropActorTranslationColumns() error {
+	migrator := e.db.Migrator()
+	// translated_key 上有索引，SQLite 删列前必须先删索引。
+	if migrator.HasIndex(&model.ActorPerson{}, "idx_actor_person_translated_key") {
+		if err := migrator.DropIndex(&model.ActorPerson{}, "idx_actor_person_translated_key"); err != nil {
+			return err
+		}
+	}
+	for _, column := range []string{"translated_name", "translated_key", "translation_source"} {
+		if !migrator.HasColumn(&model.ActorPerson{}, column) {
+			continue
+		}
+		if err := migrator.DropColumn(&model.ActorPerson{}, column); err != nil {
+			return err
+		}
+	}
+	return e.db.Where("kind = ?", "actor").Delete(&model.TranslationInfo{}).Error
 }
 
 // backfillActorPersonKeys 给升级前写入的 actor_person 补匹配键。
@@ -41,11 +65,8 @@ func (e *Engine) backfillActorPersonKeys() {
 		return
 	}
 	for _, person := range persons {
-		updates := map[string]any{"stage_key": NormalizeActorNameKey(person.StageName)}
-		if person.TranslatedName != "" {
-			updates["translated_key"] = NormalizeActorNameKey(person.TranslatedName)
-		}
-		e.db.Model(&model.ActorPerson{}).Where("id = ?", person.ID).Updates(updates)
+		e.db.Model(&model.ActorPerson{}).Where("id = ?", person.ID).
+			Update("stage_key", NormalizeActorNameKey(person.StageName))
 	}
 }
 

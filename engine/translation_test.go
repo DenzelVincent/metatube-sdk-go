@@ -32,16 +32,16 @@ func TestTranslationTerms(t *testing.T) {
 	eng := newTranslationTestEngine(t)
 
 	t.Run("save and lookup roundtrip", func(t *testing.T) {
-		saved, err := eng.SaveTranslationTerm("actor", "zh-CN", "Yui Hatsumi", "柚井初美", "Baidu")
+		saved, err := eng.SaveTranslationTerm("series", "zh-CN", "First Love", "初恋", "Baidu")
 		require.NoError(t, err)
 		require.NotNil(t, saved)
-		assert.Equal(t, "柚井初美", saved.TranslatedText)
-		assert.Equal(t, "Yui Hatsumi", saved.SourceText)
+		assert.Equal(t, "初恋", saved.TranslatedText)
+		assert.Equal(t, "First Love", saved.SourceText)
 
-		got, err := eng.GetTranslationTerm("actor", "zh-cn", "Yui Hatsumi")
+		got, err := eng.GetTranslationTerm("series", "zh-cn", "First Love")
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		assert.Equal(t, "柚井初美", got.TranslatedText)
+		assert.Equal(t, "初恋", got.TranslatedText)
 	})
 
 	t.Run("normalizes case and surrounding whitespace", func(t *testing.T) {
@@ -92,24 +92,32 @@ func TestTranslationTerms(t *testing.T) {
 	})
 
 	t.Run("returns record not found for missing term", func(t *testing.T) {
-		_, err := eng.GetTranslationTerm("actor", "zh-CN", "Nobody")
+		_, err := eng.GetTranslationTerm("series", "zh-CN", "Nobody")
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("rejects actor kind", func(t *testing.T) {
+		_, err := eng.SaveTranslationTerm("actor", "zh-CN", "x", "y", "")
+		assert.Error(t, err)
+
+		_, err = eng.GetTranslationTerm("actor", "zh-CN", "x")
+		assert.Error(t, err)
 	})
 
 	t.Run("rejects blank or invalid input", func(t *testing.T) {
 		_, err := eng.SaveTranslationTerm("", "zh-CN", "x", "y", "")
 		assert.Error(t, err)
 
-		_, err = eng.SaveTranslationTerm("actor", "zh-CN", "   ", "y", "")
+		_, err = eng.SaveTranslationTerm("series", "zh-CN", "   ", "y", "")
 		assert.Error(t, err)
 
-		_, err = eng.SaveTranslationTerm("actor", "zh-CN", "x", "   ", "")
+		_, err = eng.SaveTranslationTerm("series", "zh-CN", "x", "   ", "")
 		assert.Error(t, err)
 
-		_, err = eng.SaveTranslationTerm("actor", "zh-CN", "x", "第一行\n第二行", "")
+		_, err = eng.SaveTranslationTerm("series", "zh-CN", "x", "第一行\n第二行", "")
 		assert.Error(t, err)
 
-		_, err = eng.SaveTranslationTerm("actor", "zh-CN", strings.Repeat("a", 513), "y", "")
+		_, err = eng.SaveTranslationTerm("series", "zh-CN", strings.Repeat("a", 513), "y", "")
 		assert.Error(t, err)
 	})
 }

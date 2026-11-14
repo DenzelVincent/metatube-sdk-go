@@ -55,54 +55,51 @@ func TestActorAliasRoutes(t *testing.T) {
 		return envelope
 	}
 
-	t.Run("put then get", func(t *testing.T) {
+	t.Run("put selects kanji-rich stage name", func(t *testing.T) {
 		w := put(`{
-			"stage_name":"ゆい はつみ",
-			"translated_name":"柚井初美",
-			"translation_source":"source",
+			"names":["ゆい はつみ","柚井初美"],
 			"provider":"MINNANO",
 			"actor_id":"42",
-			"source":"JavBus"
+			"source":"auto"
 		}`)
 		require.Equal(t, http.StatusOK, w.Code)
+		assert.NotContains(t, w.Body.String(), "translated_name")
 		saved := decode(t, w)
 		require.True(t, saved.Data.Found)
 		require.NotNil(t, saved.Data.Person)
-		assert.Equal(t, "ゆい はつみ", saved.Data.Person.StageName)
-		assert.Equal(t, "柚井初美", saved.Data.Person.TranslatedName)
+		assert.Equal(t, "柚井初美", saved.Data.Person.StageName)
 
-		for _, name := range []string{"ゆい+はつみ", "柚井初美"} {
+		w = get("name=柚井初美")
+		require.Equal(t, http.StatusOK, w.Code)
+		got := decode(t, w)
+		require.True(t, got.Data.Found)
+		assert.False(t, got.Data.Ambiguous)
+		assert.Equal(t, saved.Data.Person.ID, got.Data.Person.ID)
+
+		// 落选的假名写法与复合名都不再命中。
+		for _, name := range []string{"ゆい+はつみ", "柚井初美（ゆい　はつみ）"} {
 			w = get("name=" + name)
 			require.Equal(t, http.StatusOK, w.Code)
-			got := decode(t, w)
-			require.True(t, got.Data.Found)
-			assert.False(t, got.Data.Ambiguous)
-			assert.Equal(t, saved.Data.Person.ID, got.Data.Person.ID)
-			assert.Equal(t, "柚井初美", got.Data.Person.TranslatedName)
+			assert.False(t, decode(t, w).Data.Found, "name: %s", name)
 		}
-
-		// 全半角与空白不影响匹配。
-		w = get("name=柚井初美（ゆい　はつみ）")
-		require.Equal(t, http.StatusOK, w.Code)
-		assert.False(t, decode(t, w).Data.Found)
 	})
 
 	t.Run("batch lookup returns per-name results", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/v1/actor-aliases/lookup",
-			strings.NewReader(`{"names":["ゆい はつみ","柚井初美","Nobody","  "]}`))
+			strings.NewReader(`{"names":["柚井初美","Nobody","  "]}`))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
+		assert.NotContains(t, w.Body.String(), "translated_name")
 
 		var envelope struct {
 			Data actorAliasLookupResponse `json:"data"`
 		}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &envelope))
-		require.Len(t, envelope.Data.Items, 3)
+		require.Len(t, envelope.Data.Items, 2)
 		assert.True(t, envelope.Data.Items[0].Found)
-		assert.True(t, envelope.Data.Items[1].Found)
-		assert.False(t, envelope.Data.Items[2].Found)
+		assert.False(t, envelope.Data.Items[1].Found)
 
 		req = httptest.NewRequest(http.MethodPost, "/v1/actor-aliases/lookup",
 			strings.NewReader(`{"names":[]}`))
@@ -119,10 +116,10 @@ func TestActorAliasRoutes(t *testing.T) {
 	})
 
 	t.Run("same stage name on another person is ambiguous", func(t *testing.T) {
-		w := put(`{"stage_name":"ゆい はつみ","provider":"AVBASE","actor_id":"99"}`)
+		w := put(`{"names":["柚井初美"],"provider":"AVBASE","actor_id":"99"}`)
 		require.Equal(t, http.StatusOK, w.Code)
 
-		w = get("name=ゆい+はつみ")
+		w = get("name=柚井初美")
 		require.Equal(t, http.StatusOK, w.Code)
 		got := decode(t, w)
 		assert.True(t, got.Data.Ambiguous)
@@ -131,31 +128,45 @@ func TestActorAliasRoutes(t *testing.T) {
 
 	t.Run("invalid input returns 400", func(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, put(`{"provider":"MINNANO","actor_id":"1"}`).Code)
-		assert.Equal(t, http.StatusBadRequest, put(`{"stage_name":"x","actor_id":"1"}`).Code)
+		assert.Equal(t, http.StatusBadRequest, put(`{"names":["  "],"provider":"MINNANO","actor_id":"1"}`).Code)
+		assert.Equal(t, http.StatusBadRequest, put(`{"names":["x"],"actor_id":"1"}`).Code)
 		assert.Equal(t, http.StatusBadRequest, merge(`{"person_ids":[1]}`).Code)
 	})
 
-	t.Run("merge persons", func(t *testing.T) {
-		w := put(`{"stage_name":"乙","provider":"MINNANO","actor_id":"200",
-			"translated_name":"乙女","translation_source":"source"}`)
+	t.Run("merge marks manual and blocks auto upgrade", func(t *testing.T) {
+		w := put(`{"names":["乙"],"provider":"MINNANO","actor_id":"200"}`)
 		require.Equal(t, http.StatusOK, w.Code)
 		second := decode(t, w)
 
-		w = put(`{"stage_name":"おとめ","provider":"AVBASE","actor_id":"201"}`)
+		w = put(`{"names":["おとめ"],"provider":"AVBASE","actor_id":"201"}`)
 		require.Equal(t, http.StatusOK, w.Code)
 		third := decode(t, w)
 
 		w = merge(`{"person_ids":[` +
 			jsonNumber(second.Data.Person.ID) + `,` + jsonNumber(third.Data.Person.ID) +
-			`],"stage_name":"おとめ","translated_name":"乙女"}`)
+			`],"stage_name":"乙女"}`)
 		require.Equal(t, http.StatusOK, w.Code)
 		merged := decode(t, w)
 		assert.Equal(t, second.Data.Person.ID, merged.Data.Person.ID)
-		assert.Equal(t, "乙女", merged.Data.Person.TranslatedName)
+		assert.Equal(t, "乙女", merged.Data.Person.StageName)
 
 		w = get("name=乙女")
 		require.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, second.Data.Person.ID, decode(t, w).Data.Person.ID)
+
+		// 合并后的手动名不被 auto 汉字升级覆盖。
+		w = put(`{"names":["汉字更多的名字"],"provider":"MINNANO","actor_id":"200"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "乙女", decode(t, w).Data.Person.StageName)
+	})
+
+	t.Run("person-edit source is passed through", func(t *testing.T) {
+		w := put(`{"names":["手动艺名"],"provider":"MINNANO","actor_id":"300","source":"person-edit"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		w = put(`{"names":["汉字更多"],"provider":"MINNANO","actor_id":"300"}`)
+		require.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "手动艺名", decode(t, w).Data.Person.StageName)
 	})
 }
 

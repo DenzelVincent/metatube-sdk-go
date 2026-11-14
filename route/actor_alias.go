@@ -17,11 +17,10 @@ type actorAliasQuery struct {
 }
 
 type actorAliasPersonDTO struct {
-	ID             uint   `json:"id"`
-	StageName      string `json:"stage_name"`
-	TranslatedName string `json:"translated_name,omitempty"`
-	Provider       string `json:"provider"`
-	ActorID        string `json:"actor_id"`
+	ID        uint   `json:"id"`
+	StageName string `json:"stage_name"`
+	Provider  string `json:"provider"`
+	ActorID   string `json:"actor_id"`
 }
 
 type actorAliasResponse struct {
@@ -32,18 +31,15 @@ type actorAliasResponse struct {
 }
 
 type actorAliasSaveRequest struct {
-	StageName         string `json:"stage_name" binding:"required"`
-	TranslatedName    string `json:"translated_name"`
-	TranslationSource string `json:"translation_source"`
-	Provider          string `json:"provider" binding:"required"`
-	ActorID           string `json:"actor_id" binding:"required"`
-	Source            string `json:"source"`
+	Names    []string `json:"names" binding:"required"`
+	Provider string   `json:"provider" binding:"required"`
+	ActorID  string   `json:"actor_id" binding:"required"`
+	Source   string   `json:"source"`
 }
 
 type actorAliasMergeRequest struct {
-	PersonIDs      []uint `json:"person_ids" binding:"required"`
-	StageName      string `json:"stage_name"`
-	TranslatedName string `json:"translated_name"`
+	PersonIDs []uint `json:"person_ids" binding:"required"`
+	StageName string `json:"stage_name"`
 }
 
 type actorAliasLookupRequest struct {
@@ -178,12 +174,10 @@ func putActorAlias(app *engine.Engine) gin.HandlerFunc {
 		}
 
 		person, err := app.SaveActorAlias(engine.ActorAliasInput{
-			StageName:         body.StageName,
-			TranslatedName:    body.TranslatedName,
-			TranslationSource: body.TranslationSource,
-			Provider:          body.Provider,
-			ActorID:           body.ActorID,
-			Source:            body.Source,
+			Names:    body.Names,
+			Provider: body.Provider,
+			ActorID:  body.ActorID,
+			Source:   body.Source,
 		})
 		switch {
 		case goerr.Is(err, engine.ErrActorAliasInvalid),
@@ -210,7 +204,7 @@ func mergeActorAliases(app *engine.Engine) gin.HandlerFunc {
 			return
 		}
 
-		person, err := app.MergeActorPersons(body.PersonIDs, body.StageName, body.TranslatedName)
+		person, err := app.MergeActorPersons(body.PersonIDs, body.StageName)
 		switch {
 		case goerr.Is(err, engine.ErrActorAliasMergeInvalid):
 			abortWithStatusMessage(c, http.StatusBadRequest, err)
@@ -232,10 +226,9 @@ func mergeActorAliases(app *engine.Engine) gin.HandlerFunc {
 
 func toActorAliasPersonDTO(person model.ActorPerson) actorAliasPersonDTO {
 	return actorAliasPersonDTO{
-		ID:             person.ID,
-		StageName:      person.StageName,
-		TranslatedName: person.TranslatedName,
-		Provider:       person.Provider,
-		ActorID:        person.ActorID,
+		ID:        person.ID,
+		StageName: person.StageName,
+		Provider:  person.Provider,
+		ActorID:   person.ActorID,
 	}
 }
